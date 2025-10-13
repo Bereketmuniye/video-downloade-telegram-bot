@@ -1,0 +1,30 @@
+{
+    "name": "social-downloader-bot",
+    "version": "1.0.0",
+    "description": "Free Social Media Downloader Telegram Bot",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "node index.js"
+    },
+    "dependencies": {
+        "telegraf": "^4.12.2",
+        "ytdl-core": "^4.11.5",
+        "instagram-url-direct": "^2.0.7",
+        "axios": "^1.6.0",
+        "form-data": "^4.0.0"
+    },
+    "keywords": [
+        "telegram",
+        "bot",
+        "downloader",
+        "youtube",
+        "instagram",
+        "tiktok"
+    ],
+    "author": "Bereket Muniye",
+    "license": "MIT",
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}
