@@ -6,8 +6,8 @@ const config = require("./config");
 
 const YouTubeDownloader = require("./utils/youtube");
 const InstagramDownloader = require("./utils/instagram");
-const TikTokDownloader = require("./utils/tiktok");
-const TwitterDownloader = require("./utils/twitter");
+// const TikTokDownloader = require("./utils/tiktok");
+// const TwitterDownloader = require("./utils/twitter");
 
 const bot = new Telegraf(config.BOT_TOKEN);
 
@@ -248,78 +248,78 @@ async function handleInstagramUrl(ctx, url) {
     }
 }
 
-async function handleTikTokUrl(ctx, url) {
-    try {
-        await ctx.reply("🔍 Analyzing TikTok video...");
+// async function handleTikTokUrl(ctx, url) {
+//     try {
+//         await ctx.reply("🔍 Analyzing TikTok video...");
 
-        const videoInfo = await TikTokDownloader.getVideoInfo(url);
+//         const videoInfo = await TikTokDownloader.getVideoInfo(url);
 
-        await ctx.replyWithPhoto(videoInfo.thumbnail, {
-            caption: `
-🎵 *TikTok Video Found*
+//         await ctx.replyWithPhoto(videoInfo.thumbnail, {
+//             caption: `
+// 🎵 *TikTok Video Found*
 
-*Author:* ${videoInfo.author}
-*Music:* ${videoInfo.music}
-*Duration:* ${videoInfo.duration}
+// *Author:* ${videoInfo.author}
+// *Music:* ${videoInfo.music}
+// *Duration:* ${videoInfo.duration}
 
-Click below to download:
-                `.trim(),
-            parse_mode: "Markdown",
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: "📥 Download Video",
-                            callback_data: `tiktok_${Buffer.from(url).toString(
-                                "base64"
-                            )}`,
-                        },
-                    ],
-                ],
-            },
-        });
-    } catch (error) {
-        await ctx.reply(
-            "❌ Error analyzing TikTok video. Please check the URL and try again."
-        );
-        console.error("TikTok error:", error);
-    }
-}
+// Click below to download:
+//                 `.trim(),
+//             parse_mode: "Markdown",
+//             reply_markup: {
+//                 inline_keyboard: [
+//                     [
+//                         {
+//                             text: "📥 Download Video",
+//                             callback_data: `tiktok_${Buffer.from(url).toString(
+//                                 "base64"
+//                             )}`,
+//                         },
+//                     ],
+//                 ],
+//             },
+//         });
+//     } catch (error) {
+//         await ctx.reply(
+//             "❌ Error analyzing TikTok video. Please check the URL and try again."
+//         );
+//         console.error("TikTok error:", error);
+//     }
+// }
 
-async function handleTwitterUrl(ctx, url) {
-    try {
-        await ctx.reply("🔍 Analyzing Twitter content...");
+// async function handleTwitterUrl(ctx, url) {
+//     try {
+//         await ctx.reply("🔍 Analyzing Twitter content...");
 
-        const mediaInfo = await TwitterDownloader.getMediaInfo(url);
+//         const mediaInfo = await TwitterDownloader.getMediaInfo(url);
 
-        await ctx.replyWithMarkdown(
-            `🐦 Twitter ${
-                mediaInfo.isVideo ? "Video" : "Photo"
-            } Found\n\n*Items:* ${mediaInfo.count}`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            {
-                                text: `📥 Download ${
-                                    mediaInfo.isVideo ? "Video" : "Photo"
-                                }`,
-                                callback_data: `twitter_${Buffer.from(
-                                    url
-                                ).toString("base64")}`,
-                            },
-                        ],
-                    ],
-                },
-            }
-        );
-    } catch (error) {
-        await ctx.reply(
-            "❌ Error analyzing Twitter content. Please check the URL and try again."
-        );
-        console.error("Twitter error:", error);
-    }
-}
+//         await ctx.replyWithMarkdown(
+//             `🐦 Twitter ${
+//                 mediaInfo.isVideo ? "Video" : "Photo"
+//             } Found\n\n*Items:* ${mediaInfo.count}`,
+//             {
+//                 reply_markup: {
+//                     inline_keyboard: [
+//                         [
+//                             {
+//                                 text: `📥 Download ${
+//                                     mediaInfo.isVideo ? "Video" : "Photo"
+//                                 }`,
+//                                 callback_data: `twitter_${Buffer.from(
+//                                     url
+//                                 ).toString("base64")}`,
+//                             },
+//                         ],
+//                     ],
+//                 },
+//             }
+//         );
+//     } catch (error) {
+//         await ctx.reply(
+//             "❌ Error analyzing Twitter content. Please check the URL and try again."
+//         );
+//         console.error("Twitter error:", error);
+//     }
+// }
 
 bot.on("callback_query", async (ctx) => {
     const callbackData = ctx.callbackQuery.data;
