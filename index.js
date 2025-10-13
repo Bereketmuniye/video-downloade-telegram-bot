@@ -171,49 +171,70 @@ bot.on("text", async (ctx) => {
 });
 
 async function handleYouTubeUrl(ctx, url) {
+  try {
+    await ctx.reply("🔍 Analyzing YouTube video...");
+
     try {
-        await ctx.reply("🔍 Analyzing YouTube video...");
+      const videoInfo = await YouTubeDownloader.getVideoInfo(url);
 
-        const videoInfo = await YouTubeDownloader.getVideoInfo(url);
-
-        await ctx.replyWithPhoto(videoInfo.thumbnail, {
-            caption: `
+      await ctx.replyWithPhoto(
+        { url: videoInfo.thumbnail },
+        {
+          caption: `
 📹 *YouTube Video Found*
 
 *Title:* ${videoInfo.title}
 *Channel:* ${videoInfo.author}
 *Duration:* ${videoInfo.duration}
 
-Choose download format:
-                `.trim(),
-            parse_mode: "Markdown",
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: "🎥 MP4 Video",
-                            callback_data: `youtube_video_${Buffer.from(
-                                url
-                            ).toString("base64")}`,
-                        },
-                        {
-                            text: "🎵 MP3 Audio",
-                            callback_data: `youtube_audio_${Buffer.from(
-                                url
-                            ).toString("base64")}`,
-                        },
-                    ],
-                ],
-            },
-        });
-    } catch (error) {
-        await ctx.reply(
-            "❌ Error analyzing YouTube video. Please check the URL and try again."
-        );
-        console.error("YouTube error:", error);
-    }
-}
+⚠️ *Note:* YouTube downloads are currently limited due to API changes. We're working on a fix.
 
+Choose format to try:
+                    `.trim(),
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🎥 Try MP4 Video",
+                  callback_data: `youtube_video_${Buffer.from(url).toString(
+                    "base64"
+                  )}`,
+                },
+                {
+                  text: "🎵 Try MP3 Audio",
+                  callback_data: `youtube_audio_${Buffer.from(url).toString(
+                    "base64"
+                  )}`,
+                },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (infoError) {
+      // If getting info fails, show a helpful message
+      await ctx.reply(
+        `📹 *YouTube Video Detected*\n\n` +
+          `I found a YouTube video, but currently facing technical issues due to YouTube's recent changes.\n\n` +
+          `🔧 *What's happening:*\n` +
+          `• YouTube updated their API\n` +
+          `• Download tools need updates\n` +
+          `• Working on a solution\n\n` +
+          `Try other platforms like TikTok or Twitter for now!`,
+        { parse_mode: "Markdown" }
+      );
+    }
+  } catch (error) {
+    await ctx.reply(
+      `❌ YouTube Error\n\n` +
+        `Currently experiencing issues with YouTube downloads. ` +
+        `This is a known issue we're working to fix.\n\n` +
+        `Try other social media platforms in the meantime!`
+    );
+    console.error("YouTube error:", error);
+  }
+}
 async function handleInstagramUrl(ctx, url) {
     try {
         await ctx.reply("🔍 Analyzing Instagram content...");

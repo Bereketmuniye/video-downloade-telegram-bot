@@ -1,194 +1,229 @@
-const ytdl = require("ytdl-core");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
 class YouTubeDownloader {
   /**
-   * Get video information with better error handling
+   * Get video info using external API
    */
   static async getVideoInfo(url) {
     try {
-      console.log("🔍 Checking YouTube URL:", url);
+      console.log("🔍 Fetching YouTube video info for:", url);
 
-      // Validate URL first
-      if (!ytdl.validateURL(url)) {
-        throw new Error("Invalid YouTube URL format");
-      }
-
-      // Get video info with updated options
-      const info = await ytdl.getInfo(url, {
-        lang: "en",
-        requestOptions: {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      // Method 1: Use y2mate API
+      try {
+        const apiUrl = `https://api.y2mate.guru/api/convert`;
+        const response = await axios.post(
+          apiUrl,
+          {
+            url: url,
+            format: "mp4",
           },
-        },
-      });
+          {
+            timeout: 15000,
+            headers: {
+              "Content-Type": "application/json",
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            },
+          }
+        );
 
-      console.log("✅ YouTube video info fetched successfully");
-
-      // Get the best thumbnail available
-      let thumbnail = "";
-      if (
-        info.videoDetails.thumbnails &&
-        info.videoDetails.thumbnails.length > 0
-      ) {
-        thumbnail =
-          info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1]
-            .url;
+        const data = response.data;
+        if (data && data.title) {
+          return {
+            title: data.title,
+            duration: data.duration || "Unknown",
+            thumbnail: data.thumb || "",
+            author: data.channel || "Unknown Channel",
+            formats: ["mp4", "mp3"],
+            downloadUrl: data.url || "",
+          };
+        }
+      } catch (apiError) {
+        console.log("API method failed, trying alternative...");
       }
 
-      return {
-        title: info.videoDetails.title,
-        duration: this.formatDuration(info.videoDetails.lengthSeconds),
-        thumbnail: thumbnail,
-        author: info.videoDetails.author?.name || "Unknown",
-        formats: ["mp4", "mp3"],
-      };
+      // Method 2: Use noembed for basic info
+      try {
+        const noembedUrl = `https://noembed.com/embed?url=${encodeURIComponent(
+          url
+        )}`;
+        const response = await axios.get(noembedUrl, { timeout: 10000 });
+        const data = response.data;
+
+        if (data && data.title) {
+          return {
+            title: data.title,
+            duration: "Unknown",
+            thumbnail: data.thumbnail_url || "",
+            author: data.author_name || "Unknown",
+            formats: ["mp4", "mp3"],
+            downloadUrl: null,
+          };
+        }
+      } catch (noembedError) {
+        console.log("Noembed also failed");
+      }
+
+      throw new Error("All YouTube API methods failed");
     } catch (error) {
       console.error("❌ YouTube getVideoInfo error:", error.message);
-
-      // Provide more specific error messages
-      if (error.message.includes("Sign in to confirm you are not a bot")) {
-        throw new Error(
-          "YouTube is blocking requests. Please try again later."
-        );
-      } else if (error.message.includes("Video unavailable")) {
-        throw new Error("Video is unavailable or private.");
-      } else {
-        throw new Error(`Failed to get video info: ${error.message}`);
-      }
+      throw new Error(`Failed to get video info: ${error.message}`);
     }
   }
 
   /**
-   * Download video as MP4 with fallback options
+   * Download video using external service
    */
   static async downloadVideo(url) {
     try {
-      console.log("📥 Starting YouTube video download...");
+      console.log("📥 Starting video download via external service...");
 
-      const info = await ytdl.getInfo(url);
-      const title = info.videoDetails.title.replace(/[^a-zA-Z0-9 ]/g, "");
-      const filename = `youtube_${Date.now()}_${title.substring(0, 30)}.mp4`;
-      const filepath = path.join(__dirname, "../temp", filename);
+      const videoInfo = await this.getVideoInfo(url);
 
-      // Ensure temp directory exists
-      if (!fs.existsSync(path.join(__dirname, "../temp"))) {
-        fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+      // If we have a direct download URL from the API
+      if (videoInfo.downloadUrl) {
+        const filename = `youtube_${Date.now()}.mp4`;
+        const filepath = path.join(__dirname, "../temp", filename);
+
+        if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+          fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+        }
+
+        const response = await axios({
+          method: "GET",
+          url: videoInfo.downloadUrl,
+          responseType: "stream",
+          timeout: 300000, // 5 minutes
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          },
+        });
+
+        await new Promise((resolve, reject) => {
+          const writer = fs.createWriteStream(filepath);
+          response.data.pipe(writer);
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+        });
+
+        return filepath;
       }
 
-      return new Promise((resolve, reject) => {
-        try {
-          // Try different quality options
-          const videoStream = ytdl(url, {
-            quality: "highest",
-            filter: (format) => format.hasVideo && format.hasAudio,
-            requestOptions: {
-              headers: {
-                "User-Agent":
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              },
-            },
-          });
-
-          const writeStream = fs.createWriteStream(filepath);
-
-          videoStream.pipe(writeStream);
-
-          videoStream.on("progress", (chunkLength, downloaded, total) => {
-            const percent = ((downloaded / total) * 100).toFixed(2);
-            console.log(`📥 Download progress: ${percent}%`);
-          });
-
-          writeStream.on("finish", () => {
-            console.log("✅ Video download completed:", filepath);
-            resolve(filepath);
-          });
-
-          writeStream.on("error", (error) => {
-            console.error("❌ Write stream error:", error);
-            reject(new Error(`File write failed: ${error.message}`));
-          });
-
-          videoStream.on("error", (error) => {
-            console.error("❌ Video stream error:", error);
-            reject(new Error(`Video download failed: ${error.message}`));
-          });
-        } catch (streamError) {
-          reject(new Error(`Stream setup failed: ${streamError.message}`));
-        }
-      });
+      // If no direct download URL, use ytdl-core as fallback
+      return await this.downloadWithYtdlCore(url, "video");
     } catch (error) {
-      console.error("❌ YouTube downloadVideo error:", error.message);
+      console.error("❌ Video download error:", error.message);
       throw new Error(`Video download failed: ${error.message}`);
     }
   }
 
   /**
-   * Download audio as MP3
+   * Download audio using external service
    */
   static async downloadAudio(url) {
     try {
-      console.log("🎵 Starting YouTube audio download...");
+      console.log("🎵 Starting audio download via external service...");
 
-      const info = await ytdl.getInfo(url);
-      const title = info.videoDetails.title.replace(/[^a-zA-Z0-9 ]/g, "");
-      const filename = `youtube_${Date.now()}_${title.substring(0, 30)}.mp3`;
-      const filepath = path.join(__dirname, "../temp", filename);
+      // Try to get audio download URL from API
+      try {
+        const apiUrl = `https://api.y2mate.guru/api/convert`;
+        const response = await axios.post(
+          apiUrl,
+          {
+            url: url,
+            format: "mp3",
+          },
+          {
+            timeout: 15000,
+          }
+        );
 
-      // Ensure temp directory exists
-      if (!fs.existsSync(path.join(__dirname, "../temp"))) {
-        fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+        const data = response.data;
+        if (data && data.url) {
+          const filename = `youtube_${Date.now()}.mp3`;
+          const filepath = path.join(__dirname, "../temp", filename);
+
+          if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+            fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+          }
+
+          const audioResponse = await axios({
+            method: "GET",
+            url: data.url,
+            responseType: "stream",
+            timeout: 300000,
+          });
+
+          await new Promise((resolve, reject) => {
+            const writer = fs.createWriteStream(filepath);
+            audioResponse.data.pipe(writer);
+            writer.on("finish", resolve);
+            writer.on("error", reject);
+          });
+
+          return filepath;
+        }
+      } catch (apiError) {
+        console.log("Audio API failed, using ytdl-core fallback");
       }
 
-      return new Promise((resolve, reject) => {
-        try {
-          const audioStream = ytdl(url, {
-            filter: "audioonly",
-            quality: "highestaudio",
-            requestOptions: {
-              headers: {
-                "User-Agent":
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-              },
-            },
-          });
-
-          const writeStream = fs.createWriteStream(filepath);
-
-          audioStream.pipe(writeStream);
-
-          audioStream.on("progress", (chunkLength, downloaded, total) => {
-            const percent = ((downloaded / total) * 100).toFixed(2);
-            console.log(`🎵 Audio download progress: ${percent}%`);
-          });
-
-          writeStream.on("finish", () => {
-            console.log("✅ Audio download completed:", filepath);
-            resolve(filepath);
-          });
-
-          writeStream.on("error", (error) => {
-            reject(new Error(`File write failed: ${error.message}`));
-          });
-
-          audioStream.on("error", (error) => {
-            reject(new Error(`Audio download failed: ${error.message}`));
-          });
-        } catch (streamError) {
-          reject(new Error(`Stream setup failed: ${streamError.message}`));
-        }
-      });
+      // Fallback to ytdl-core
+      return await this.downloadWithYtdlCore(url, "audio");
     } catch (error) {
-      console.error("❌ YouTube downloadAudio error:", error.message);
+      console.error("❌ Audio download error:", error.message);
       throw new Error(`Audio download failed: ${error.message}`);
     }
   }
 
   /**
-   * Format duration from seconds to MM:SS
+   * Fallback method using ytdl-core
+   */
+  static async downloadWithYtdlCore(url, type) {
+    try {
+      const ytdl = require("ytdl-core");
+
+      if (!ytdl.validateURL(url)) {
+        throw new Error("Invalid YouTube URL");
+      }
+
+      const info = await ytdl.getInfo(url);
+      const title = info.videoDetails.title.replace(/[^a-zA-Z0-9 ]/g, "");
+      const extension = type === "video" ? "mp4" : "mp3";
+      const filename = `youtube_${Date.now()}_${title.substring(
+        0,
+        30
+      )}.${extension}`;
+      const filepath = path.join(__dirname, "../temp", filename);
+
+      if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+        fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+      }
+
+      return new Promise((resolve, reject) => {
+        const options =
+          type === "video"
+            ? { quality: "highest", filter: "audioandvideo" }
+            : { filter: "audioonly", quality: "highestaudio" };
+
+        const stream = ytdl(url, options);
+        const writeStream = fs.createWriteStream(filepath);
+
+        stream.pipe(writeStream);
+
+        writeStream.on("finish", () => resolve(filepath));
+        writeStream.on("error", reject);
+        stream.on("error", reject);
+      });
+    } catch (error) {
+      throw new Error(`Fallback download failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Format duration
    */
   static formatDuration(seconds) {
     try {
