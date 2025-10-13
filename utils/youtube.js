@@ -4,36 +4,66 @@ const path = require("path");
 
 class YouTubeDownloader {
   /**
-   * Get video information
+   * Get video information with better error handling
    */
   static async getVideoInfo(url) {
     try {
       console.log("🔍 Checking YouTube URL:", url);
 
+      // Validate URL first
       if (!ytdl.validateURL(url)) {
-        throw new Error("Invalid YouTube URL");
+        throw new Error("Invalid YouTube URL format");
       }
 
-      const info = await ytdl.getInfo(url);
+      // Get video info with updated options
+      const info = await ytdl.getInfo(url, {
+        lang: "en",
+        requestOptions: {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          },
+        },
+      });
+
       console.log("✅ YouTube video info fetched successfully");
+
+      // Get the best thumbnail available
+      let thumbnail = "";
+      if (
+        info.videoDetails.thumbnails &&
+        info.videoDetails.thumbnails.length > 0
+      ) {
+        thumbnail =
+          info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1]
+            .url;
+      }
 
       return {
         title: info.videoDetails.title,
         duration: this.formatDuration(info.videoDetails.lengthSeconds),
-        thumbnail:
-          info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1]
-            .url,
-        author: info.videoDetails.author.name,
+        thumbnail: thumbnail,
+        author: info.videoDetails.author?.name || "Unknown",
         formats: ["mp4", "mp3"],
       };
     } catch (error) {
       console.error("❌ YouTube getVideoInfo error:", error.message);
-      throw new Error(`Failed to get video info: ${error.message}`);
+
+      // Provide more specific error messages
+      if (error.message.includes("Sign in to confirm you are not a bot")) {
+        throw new Error(
+          "YouTube is blocking requests. Please try again later."
+        );
+      } else if (error.message.includes("Video unavailable")) {
+        throw new Error("Video is unavailable or private.");
+      } else {
+        throw new Error(`Failed to get video info: ${error.message}`);
+      }
     }
   }
 
   /**
-   * Download video as MP4
+   * Download video as MP4 with fallback options
    */
   static async downloadVideo(url) {
     try {
@@ -50,34 +80,45 @@ class YouTubeDownloader {
       }
 
       return new Promise((resolve, reject) => {
-        const videoStream = ytdl(url, {
-          quality: "highest",
-          filter: "audioandvideo",
-        });
+        try {
+          // Try different quality options
+          const videoStream = ytdl(url, {
+            quality: "highest",
+            filter: (format) => format.hasVideo && format.hasAudio,
+            requestOptions: {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              },
+            },
+          });
 
-        const writeStream = fs.createWriteStream(filepath);
+          const writeStream = fs.createWriteStream(filepath);
 
-        videoStream.pipe(writeStream);
+          videoStream.pipe(writeStream);
 
-        videoStream.on("progress", (chunkLength, downloaded, total) => {
-          const percent = ((downloaded / total) * 100).toFixed(2);
-          console.log(`📥 Download progress: ${percent}%`);
-        });
+          videoStream.on("progress", (chunkLength, downloaded, total) => {
+            const percent = ((downloaded / total) * 100).toFixed(2);
+            console.log(`📥 Download progress: ${percent}%`);
+          });
 
-        writeStream.on("finish", () => {
-          console.log("✅ Video download completed:", filepath);
-          resolve(filepath);
-        });
+          writeStream.on("finish", () => {
+            console.log("✅ Video download completed:", filepath);
+            resolve(filepath);
+          });
 
-        writeStream.on("error", (error) => {
-          console.error("❌ Write stream error:", error);
-          reject(error);
-        });
+          writeStream.on("error", (error) => {
+            console.error("❌ Write stream error:", error);
+            reject(new Error(`File write failed: ${error.message}`));
+          });
 
-        videoStream.on("error", (error) => {
-          console.error("❌ Video stream error:", error);
-          reject(error);
-        });
+          videoStream.on("error", (error) => {
+            console.error("❌ Video stream error:", error);
+            reject(new Error(`Video download failed: ${error.message}`));
+          });
+        } catch (streamError) {
+          reject(new Error(`Stream setup failed: ${streamError.message}`));
+        }
       });
     } catch (error) {
       console.error("❌ YouTube downloadVideo error:", error.message);
@@ -103,27 +144,42 @@ class YouTubeDownloader {
       }
 
       return new Promise((resolve, reject) => {
-        const audioStream = ytdl(url, {
-          filter: "audioonly",
-          quality: "highestaudio",
-        });
+        try {
+          const audioStream = ytdl(url, {
+            filter: "audioonly",
+            quality: "highestaudio",
+            requestOptions: {
+              headers: {
+                "User-Agent":
+                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              },
+            },
+          });
 
-        const writeStream = fs.createWriteStream(filepath);
+          const writeStream = fs.createWriteStream(filepath);
 
-        audioStream.pipe(writeStream);
+          audioStream.pipe(writeStream);
 
-        audioStream.on("progress", (chunkLength, downloaded, total) => {
-          const percent = ((downloaded / total) * 100).toFixed(2);
-          console.log(`🎵 Audio download progress: ${percent}%`);
-        });
+          audioStream.on("progress", (chunkLength, downloaded, total) => {
+            const percent = ((downloaded / total) * 100).toFixed(2);
+            console.log(`🎵 Audio download progress: ${percent}%`);
+          });
 
-        writeStream.on("finish", () => {
-          console.log("✅ Audio download completed:", filepath);
-          resolve(filepath);
-        });
+          writeStream.on("finish", () => {
+            console.log("✅ Audio download completed:", filepath);
+            resolve(filepath);
+          });
 
-        writeStream.on("error", reject);
-        audioStream.on("error", reject);
+          writeStream.on("error", (error) => {
+            reject(new Error(`File write failed: ${error.message}`));
+          });
+
+          audioStream.on("error", (error) => {
+            reject(new Error(`Audio download failed: ${error.message}`));
+          });
+        } catch (streamError) {
+          reject(new Error(`Stream setup failed: ${streamError.message}`));
+        }
       });
     } catch (error) {
       console.error("❌ YouTube downloadAudio error:", error.message);
@@ -137,6 +193,8 @@ class YouTubeDownloader {
   static formatDuration(seconds) {
     try {
       const secs = parseInt(seconds);
+      if (isNaN(secs)) return "Unknown";
+
       const mins = Math.floor(secs / 60);
       const remainingSecs = Math.floor(secs % 60);
       return `${mins}:${remainingSecs.toString().padStart(2, "0")}`;

@@ -169,16 +169,15 @@ bot.on("text", async (ctx) => {
         );
     }
 });
+
 async function handleYouTubeUrl(ctx, url) {
-  try {
-    await ctx.reply("🔍 Analyzing YouTube video...");
-    console.log("🔄 Processing YouTube URL:", url);
+    try {
+        await ctx.reply("🔍 Analyzing YouTube video...");
 
-    const videoInfo = await YouTubeDownloader.getVideoInfo(url);
-    console.log("✅ Video info:", videoInfo.title);
+        const videoInfo = await YouTubeDownloader.getVideoInfo(url);
 
-    await ctx.replyWithPhoto(videoInfo.thumbnail, {
-      caption: `
+        await ctx.replyWithPhoto(videoInfo.thumbnail, {
+            caption: `
 📹 *YouTube Video Found*
 
 *Title:* ${videoInfo.title}
@@ -186,33 +185,33 @@ async function handleYouTubeUrl(ctx, url) {
 *Duration:* ${videoInfo.duration}
 
 Choose download format:
-            `.trim(),
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "🎥 MP4 Video",
-              callback_data: `youtube_video_${Buffer.from(url).toString(
-                "base64"
-              )}`,
+                `.trim(),
+            parse_mode: "Markdown",
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {
+                            text: "🎥 MP4 Video",
+                            callback_data: `youtube_video_${Buffer.from(
+                                url
+                            ).toString("base64")}`,
+                        },
+                        {
+                            text: "🎵 MP3 Audio",
+                            callback_data: `youtube_audio_${Buffer.from(
+                                url
+                            ).toString("base64")}`,
+                        },
+                    ],
+                ],
             },
-            {
-              text: "🎵 MP3 Audio",
-              callback_data: `youtube_audio_${Buffer.from(url).toString(
-                "base64"
-              )}`,
-            },
-          ],
-        ],
-      },
-    });
-  } catch (error) {
-    console.error("❌ YouTube URL handling error:", error);
-    await ctx.reply(
-      `❌ Error analyzing YouTube video: ${error.message}\n\nPlease check:\n• URL is valid\n• Video is not private\n• Video is available in your region`
-    );
-  }
+        });
+    } catch (error) {
+        await ctx.reply(
+            "❌ Error analyzing YouTube video. Please check the URL and try again."
+        );
+        console.error("YouTube error:", error);
+    }
 }
 
 async function handleInstagramUrl(ctx, url) {
