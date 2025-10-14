@@ -1,78 +1,80 @@
-const { Downloader } = require("@totallynodavid/downloader");
+const { twitter } = require("twitter-url-direct");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
+/**
+ * Twitter Downloader Functions
+ * Handles Twitter video downloads
+ */
+
 class TwitterDownloader {
-  /**
-   * Get media info using external service
-   */
-  static async getMediaInfo(url) {
-    try {
-      console.log("🔍 Fetching Twitter media info for:", url);
+    /**
+     * Get Twitter media information
+     * @param {string} url - Twitter URL
+     * @returns {Object} Media info
+     */
+    static async getMediaInfo(url) {
+        try {
+            const mediaUrls = await twitter(url);
 
-      const downloader = new Downloader({
-        downloadDir: path.join(__dirname, "../temp"),
-      });
+            if (!mediaUrls || mediaUrls.length === 0) {
+                throw new Error("No media found in this Twitter URL");
+            }
 
-      const options = { downloadMedia: false };
-      const result = await downloader.getMediaInfo(url, options);
-
-      if (!result || !result.urls || result.urls.length === 0) {
-        throw new Error("No media found in this Twitter URL");
-      }
-
-      const firstUrl = result.urls[0];
-      const isVideo =
-        firstUrl.format.includes("video") || firstUrl.url.includes(".mp4");
-      const type = isVideo ? "Video" : "Photo";
-
-      return {
-        urls: result.urls.map((u) => u.url),
-        isVideo,
-        type,
-        count: result.urls.length,
-      };
-    } catch (error) {
-      console.error("❌ Twitter getMediaInfo error:", error.message);
-      throw new Error(`Failed to get media info: ${error.message}`);
+            return {
+                urls: mediaUrls,
+                isVideo: mediaUrls[0].includes(".mp4"),
+                count: mediaUrls.length,
+            };
+        } catch (error) {
+            throw new Error(`Twitter download failed: ${error.message}`);
+        }
     }
-  }
 
-  /**
-   * Download media using external service
-   */
-  static async downloadMedia(url) {
-    try {
-      console.log("📥 Starting media download via external service...");
+    /**
+     * Download Twitter media
+     * @param {string} url - Twitter URL
+     * @returns {Array} Array of downloaded file paths
+     */
+    static async downloadMedia(url) {
+        try {
+            const mediaInfo = await this.getMediaInfo(url);
+            const downloadedFiles = [];
 
-      const downloader = new Downloader({
-        downloadDir: path.join(__dirname, "../temp"),
-      });
+            for (let i = 0; i < mediaInfo.urls.length; i++) {
+                const mediaUrl = mediaInfo.urls[i];
+                const extension = mediaInfo.isVideo ? "mp4" : "jpg";
+                const filename = `twitter_${Date.now()}_${i}.${extension}`;
+                const filepath = path.join(__dirname, "../temp", filename);
 
-      const options = {
-        downloadMedia: true,
-      };
+                // Ensure temp directory exists
+                if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+                    fs.mkdirSync(path.join(__dirname, "../temp"));
+                }
 
-      const result = await downloader.getMediaInfo(url, options);
+                // Download file
+                const response = await axios({
+                    method: "GET",
+                    url: mediaUrl,
+                    responseType: "stream",
+                });
 
-      if (!result || !result.urls || result.urls.length === 0) {
-        throw new Error("No media downloaded");
-      }
+                await new Promise((resolve, reject) => {
+                    const writer = fs.createWriteStream(filepath);
+                    response.data.pipe(writer);
+                    writer.on("finish", resolve);
+                    writer.on("error", reject);
+                });
 
-      const downloadedFiles = result.urls
-        .map((u) => u.localPath)
-        .filter((path) => path && fs.existsSync(path));
+                downloadedFiles.push(filepath);
+            }
 
-      if (downloadedFiles.length === 0) {
-        throw new Error("No files were successfully downloaded");
-      }
-
-      return downloadedFiles;
-    } catch (error) {
-      console.error("❌ Media download error:", error.message);
-      throw new Error(`Media download failed: ${error.message}`);
+            return downloadedFiles;
+        } catch (error) {
+            throw new Error(`Twitter download failed: ${error.message}`);
+        }
     }
-  }
 }
 
 module.exports = TwitterDownloader;
