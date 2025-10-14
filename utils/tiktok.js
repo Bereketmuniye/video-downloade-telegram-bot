@@ -1,46 +1,65 @@
-// utils/tiktok.js
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const ytdlp = require("yt-dlp-exec").raw;
-const glob = require("glob");
 
-const TEMP_DIR = path.join(__dirname, "..", "temp");
-if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+class TikTokDownloader {
+  static async getVideoInfo(url) {
+    try {
+      const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(
+        url
+      )}`;
+      const response = await axios.get(apiUrl);
+      const data = response.data;
 
-async function runYtDlp(url, args = {}) {
-  return ytdlp(url, args);
+      if (data.code === 0 && data.data) {
+        return {
+          title: data.data.title || "TikTok Video",
+          author: data.data.author?.nickname || "Unknown",
+          duration: "Unknown",
+          thumbnail: `https://www.tikwm.com${data.data.cover}`,
+          videoUrl: `https://www.tikwm.com${data.data.play}`,
+        };
+      } else {
+        throw new Error("Failed to get TikTok video info");
+      }
+    } catch (error) {
+      throw new Error(`TikTok download failed: ${error.message}`);
+    }
+  }
+
+  static async downloadVideo(url) {
+    try {
+      const videoInfo = await this.getVideoInfo(url);
+      const filename = `tiktok_${Date.now()}.mp4`;
+      const filepath = path.join(__dirname, "../temp", filename);
+
+      if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+        fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
+      }
+
+      const response = await axios({
+        method: "GET",
+        url: videoInfo.videoUrl,
+        responseType: "stream",
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Referer: "https://www.tikwm.com/",
+        },
+      });
+
+      await new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(filepath);
+        response.data.pipe(writer);
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+      });
+
+      return filepath;
+    } catch (error) {
+      throw new Error(`TikTok video download failed: ${error.message}`);
+    }
+  }
 }
 
-module.exports = {
-  async downloadMedia(url) {
-    const prefix = `tiktok_${Date.now()}_`;
-    const outputTemplate = path.join(TEMP_DIR, prefix + "%(id)s.%(ext)s");
-    try {
-      await runYtDlp(url, {
-        output: outputTemplate,
-        format: "mp4",
-        no_warnings: true,
-        ignore_errors: true,
-      });
-
-      const files = glob.sync(path.join(TEMP_DIR, `${prefix}*`));
-      return files;
-    } catch (err) {
-      console.error("TikTok download error:", err);
-      throw err;
-    }
-  },
-
-  async getInfo(url) {
-    try {
-      const info = await runYtDlp(url, {
-        dump_single_json: true,
-        no_warnings: true,
-      });
-      return info;
-    } catch (err) {
-      console.error("TikTok info error:", err);
-      return null;
-    }
-  },
-};
+module.exports = TikTokDownloader;

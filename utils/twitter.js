@@ -1,46 +1,80 @@
-// utils/twitter.js
+const { twitter } = require("twitter-url-direct");
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const ytdlp = require("yt-dlp-exec").raw;
-const glob = require("glob");
 
-const TEMP_DIR = path.join(__dirname, "..", "temp");
-if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
+/**
+ * Twitter Downloader Functions
+ * Handles Twitter video downloads
+ */
 
-async function runYtDlp(url, args = {}) {
-  return ytdlp(url, args);
+class TwitterDownloader {
+    /**
+     * Get Twitter media information
+     * @param {string} url - Twitter URL
+     * @returns {Object} Media info
+     */
+    static async getMediaInfo(url) {
+        try {
+            const mediaUrls = await twitter(url);
+
+            if (!mediaUrls || mediaUrls.length === 0) {
+                throw new Error("No media found in this Twitter URL");
+            }
+
+            return {
+                urls: mediaUrls,
+                isVideo: mediaUrls[0].includes(".mp4"),
+                count: mediaUrls.length,
+            };
+        } catch (error) {
+            throw new Error(`Twitter download failed: ${error.message}`);
+        }
+    }
+
+    /**
+     * Download Twitter media
+     * @param {string} url - Twitter URL
+     * @returns {Array} Array of downloaded file paths
+     */
+    static async downloadMedia(url) {
+        try {
+            const mediaInfo = await this.getMediaInfo(url);
+            const downloadedFiles = [];
+
+            for (let i = 0; i < mediaInfo.urls.length; i++) {
+                const mediaUrl = mediaInfo.urls[i];
+                const extension = mediaInfo.isVideo ? "mp4" : "jpg";
+                const filename = `twitter_${Date.now()}_${i}.${extension}`;
+                const filepath = path.join(__dirname, "../temp", filename);
+
+                // Ensure temp directory exists
+                if (!fs.existsSync(path.join(__dirname, "../temp"))) {
+                    fs.mkdirSync(path.join(__dirname, "../temp"));
+                }
+
+                // Download file
+                const response = await axios({
+                    method: "GET",
+                    url: mediaUrl,
+                    responseType: "stream",
+                });
+
+                await new Promise((resolve, reject) => {
+                    const writer = fs.createWriteStream(filepath);
+                    response.data.pipe(writer);
+                    writer.on("finish", resolve);
+                    writer.on("error", reject);
+                });
+
+                downloadedFiles.push(filepath);
+            }
+
+            return downloadedFiles;
+        } catch (error) {
+            throw new Error(`Twitter download failed: ${error.message}`);
+        }
+    }
 }
 
-module.exports = {
-  async downloadMedia(url) {
-    const prefix = `twitter_${Date.now()}_`;
-    const outputTemplate = path.join(TEMP_DIR, prefix + "%(id)s.%(ext)s");
-    try {
-      await runYtDlp(url, {
-        output: outputTemplate,
-        format: "best",
-        no_warnings: true,
-        ignore_errors: true,
-      });
-
-      const files = glob.sync(path.join(TEMP_DIR, `${prefix}*`));
-      return files;
-    } catch (err) {
-      console.error("Twitter download error:", err);
-      throw err;
-    }
-  },
-
-  async getInfo(url) {
-    try {
-      const info = await runYtDlp(url, {
-        dump_single_json: true,
-        no_warnings: true,
-      });
-      return info;
-    } catch (err) {
-      console.error("Twitter info error:", err);
-      return null;
-    }
-  },
-};
+module.exports = TwitterDownloader;
