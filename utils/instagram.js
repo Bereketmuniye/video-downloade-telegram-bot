@@ -1,81 +1,44 @@
-const { fromUrl } = require("instagram-url-direct");
 const axios = require("axios");
-const fs = require("fs");
 const path = require("path");
-
-/**
- * Instagram Downloader Functions
- * Handles posts, reels, and stories from Instagram
- */
+const fs = require("fs");
 
 class InstagramDownloader {
     /**
-     * Get Instagram media information
-     * @param {string} url - Instagram URL
-     * @returns {Object} Media info
+     * Attempts to get basic media info from Instagram URL.
+     * NOTE: Actual implementation requires web scraping or a stable, paid API.
      */
     static async getMediaInfo(url) {
-        try {
-            const links = await fromUrl(url);
-
-            if (!links || links.length === 0) {
-                throw new Error("No media found in this Instagram URL");
-            }
-
-            return {
-                type: links[0].type || "post",
-                urls: links.map((link) => link.url),
-                isVideo: links[0].type === "video",
-                count: links.length,
-            };
-        } catch (error) {
-            throw new Error(`Instagram download failed: ${error.message}`);
-        }
+        console.log("🔍 Fetching Instagram info for:", url);
+        
+        // *** PLACEHOLDER LOGIC START ***
+        const isVideo = url.includes('reels') || url.includes('/tv/');
+        return {
+            isVideo: isVideo,
+            type: isVideo ? "Reel/Video" : "Post/Story",
+            count: 1, // Assume single item for safety
+            files: []
+        };
+        // *** PLACEHOLDER LOGIC END ***
     }
 
     /**
-     * Download Instagram media
-     * @param {string} url - Instagram URL
-     * @returns {Array} Array of downloaded file paths
+     * Downloads media from the given Instagram URL.
+     * @returns {Promise<string[]>} - Array of downloaded file paths.
      */
     static async downloadMedia(url) {
-        try {
-            const mediaInfo = await this.getMediaInfo(url);
-            const downloadedFiles = [];
+        // You need to replace this with actual download logic (e.g., using a third-party API service)
+        throw new Error("Instagram Downloader is not yet implemented. Please replace the placeholder logic in utils/instagram.js");
+        // Example structure for a download:
+        /*
+        // Create temp file path
+        const filename = `instagram_${Date.now()}.mp4`;
+        const filepath = path.join(__dirname, "../temp", filename);
 
-            for (let i = 0; i < mediaInfo.urls.length; i++) {
-                const mediaUrl = mediaInfo.urls[i];
-                const extension = mediaInfo.isVideo ? "mp4" : "jpg";
-                const filename = `instagram_${Date.now()}_${i}.${extension}`;
-                const filepath = path.join(__dirname, "../temp", filename);
+        // Actual download logic (e.g., streaming data from an external API response)
+        // await downloadFile(mediaUrl, filepath); 
 
-                // Ensure temp directory exists
-                if (!fs.existsSync(path.join(__dirname, "../temp"))) {
-                    fs.mkdirSync(path.join(__dirname, "../temp"));
-                }
-
-                // Download file
-                const response = await axios({
-                    method: "GET",
-                    url: mediaUrl,
-                    responseType: "stream",
-                });
-
-                await new Promise((resolve, reject) => {
-                    const writer = fs.createWriteStream(filepath);
-                    response.data.pipe(writer);
-                    writer.on("finish", resolve);
-                    writer.on("error", reject);
-                });
-
-                downloadedFiles.push(filepath);
-            }
-
-            return downloadedFiles;
-        } catch (error) {
-            throw new Error(`Instagram download failed: ${error.message}`);
-        }
+        return [filepath]; // Return an array of paths
+        */
     }
 }
-
 module.exports = InstagramDownloader;

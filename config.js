@@ -10,10 +10,10 @@ module.exports = {
     },
 
     URL_PATTERNS: {
-        YOUTUBE: /(youtube\.com|youtu\.be)/,
-        INSTAGRAM: /(instagram\.com|instagr\.am)/,
-        TIKTOK: /(tiktok\.com|vm\.tiktok\.com)/,
-        TWITTER: /(twitter\.com|x\.com)/,
+         YOUTUBE: /youtu\.be\/|youtube\.com\/watch\?v=|youtube\.com\/shorts\//i,
+    INSTAGRAM: /instagram\.com\/(p|reels|stories)\//i,
+    TIKTOK: /tiktok\.com\//i,
+    TWITTER: /(twitter|x)\.com\/\w+\/status\/\d+/i,
     },
 };
 

@@ -1,34 +1,21 @@
 {
-    "name": "social-downloader-bot",
-    "version": "1.0.0",
-    "description": "Free Social Media Downloader Telegram Bot",
-    "main": "index.js",
-    "scripts": {
-        "start": "node index.js",
-        "dev": "node index.js"
-    },
-    "dependencies": {
-        "axios": "^1.6.0",
-        "dotenv": "^17.2.3",
-        "form-data": "^4.0.0",
-        "glob": "^11.0.3",
-        "instagram-url-direct": "^2.0.7",
-        "mime": "^4.1.0",
-        "telegraf": "^4.16.3",
-        "ytdl-core": "^4.11.5",
-        "ytdlp-nodejs": "^2.3.4"
-    },
-    "keywords": [
-        "telegram",
-        "bot",
-        "downloader",
-        "youtube",
-        "instagram",
-        "tiktok"
-    ],
-    "author": "Bereket Muniye",
-    "license": "MIT",
-    "engines": {
-        "node": ">=20.0.0"
-    }
+  "name": "social-media-downloader-bot",
+  "version": "1.0.0",
+  "description": "A Telegram bot to download media from various social platforms.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "downloader"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "telegraf": "^4.16.0",
+    "ytdl-core": "^4.11.5"
+  }
 }
