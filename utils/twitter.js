@@ -1,8 +1,6 @@
-const { twitter } = require("twitter-url-direct");
-const axios = require("axios");
+const { Downloader } = require("@totallynodavid/downloader");
 const fs = require("fs");
 const path = require("path");
-const urlModule = require("url");
 
 class TwitterDownloader {
   /**
@@ -12,20 +10,27 @@ class TwitterDownloader {
     try {
       console.log("🔍 Fetching Twitter media info for:", url);
 
-      const mediaUrls = await twitter(url);
+      const downloader = new Downloader({
+        downloadDir: path.join(__dirname, "../temp"),
+      });
 
-      if (!mediaUrls || mediaUrls.length === 0) {
+      const options = { downloadMedia: false };
+      const result = await downloader.getMediaInfo(url, options);
+
+      if (!result || !result.urls || result.urls.length === 0) {
         throw new Error("No media found in this Twitter URL");
       }
 
-      const isVideo = mediaUrls[0].includes(".mp4");
+      const firstUrl = result.urls[0];
+      const isVideo =
+        firstUrl.format.includes("video") || firstUrl.url.includes(".mp4");
       const type = isVideo ? "Video" : "Photo";
 
       return {
-        urls: mediaUrls,
+        urls: result.urls.map((u) => u.url),
         isVideo,
         type,
-        count: mediaUrls.length,
+        count: result.urls.length,
       };
     } catch (error) {
       console.error("❌ Twitter getMediaInfo error:", error.message);
@@ -40,46 +45,26 @@ class TwitterDownloader {
     try {
       console.log("📥 Starting media download via external service...");
 
-      const mediaInfo = await this.getMediaInfo(url);
-      const downloadedFiles = [];
+      const downloader = new Downloader({
+        downloadDir: path.join(__dirname, "../temp"),
+      });
 
-      for (let i = 0; i < mediaInfo.urls.length; i++) {
-        const mediaUrl = mediaInfo.urls[i];
-        const parsedUrl = new urlModule.URL(mediaUrl);
-        let ext = path.extname(parsedUrl.pathname);
-        if (!ext) {
-          ext = mediaUrl.includes(".mp4") ? ".mp4" : ".jpg";
-        }
-        const filename = `twitter_${Date.now()}_${i}${ext}`;
-        const filepath = path.join(__dirname, "../temp", filename);
+      const options = {
+        downloadMedia: true,
+      };
 
-        if (!fs.existsSync(path.join(__dirname, "../temp"))) {
-          fs.mkdirSync(path.join(__dirname, "../temp"), { recursive: true });
-        }
+      const result = await downloader.getMediaInfo(url, options);
 
-        const response = await axios({
-          method: "GET",
-          url: mediaUrl,
-          responseType: "stream",
-          timeout: 300000, // 5 minutes
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-          },
-        });
+      if (!result || !result.urls || result.urls.length === 0) {
+        throw new Error("No media downloaded");
+      }
 
-        await new Promise((resolve, reject) => {
-          const writer = fs.createWriteStream(filepath);
-          response.data.pipe(writer);
-          writer.on("finish", () => {
-            console.log(`Downloaded: ${filepath}`);
-            resolve();
-          });
-          writer.on("error", reject);
-          response.data.on("error", reject);
-        });
+      const downloadedFiles = result.urls
+        .map((u) => u.localPath)
+        .filter((path) => path && fs.existsSync(path));
 
-        downloadedFiles.push(filepath);
+      if (downloadedFiles.length === 0) {
+        throw new Error("No files were successfully downloaded");
       }
 
       return downloadedFiles;
