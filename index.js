@@ -108,7 +108,7 @@ Use /support to contact the developer
 
 bot.command("support", (ctx) => {
     ctx.replyWithMarkdown(
-        `
+      `
 💬 *Support Information*
 
 If you encounter any issues:
@@ -122,7 +122,7 @@ If you encounter any issues:
 • Very large files exceed Telegram limits
 
 *Developer Contact:*
-[@YourUsername](https://t.me/YourUsername)
+[@@champion_chasers](https://t.me/@champion_chasers)
     `.trim()
     );
 });
