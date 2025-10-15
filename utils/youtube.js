@@ -1,84 +1,47 @@
-const fs = require("fs");
-const path = require("path");
 const ytdl = require("ytdl-core");
 
 class YouTubeDownloader {
-  constructor(downloadFolder = path.resolve(__dirname, "../downloads")) {
-    this.downloadFolder = downloadFolder;
-
-    // Ensure download folder exists
-    if (!fs.existsSync(this.downloadFolder)) {
-      fs.mkdirSync(this.downloadFolder, { recursive: true });
+  static async getVideoInfo(url) {
+    try {
+      const info = await ytdl.getInfo(url);
+      return {
+        title: info.videoDetails.title,
+        author: info.videoDetails.author.name,
+        duration: info.videoDetails.lengthSeconds,
+        thumbnail: info.videoDetails.thumbnails.pop().url,
+      };
+    } catch (err) {
+      console.error("ytdl-core error:", err);
+      throw err;
     }
   }
 
-  /**
-   * Get video information
-   * @param {string} url - YouTube video URL
-   * @returns {Promise<Object>}
-   */
-  async getVideoInfo(url) {
-    const info = await ytdl.getInfo(url);
-    return {
-      title: info.videoDetails.title,
-      author: info.videoDetails.author.name,
-      duration: parseInt(info.videoDetails.lengthSeconds),
-      thumbnail: info.videoDetails.thumbnails.pop().url,
-    };
+  static formatDuration(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
-  /**
-   * Format seconds into hh:mm:ss
-   * @param {number} seconds
-   */
-  formatDuration(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h ? h + ":" : ""}${m.toString().padStart(2, "0")}:${s
-      .toString()
-      .padStart(2, "0")}`;
-  }
-
-  /**
-   * Download video in MP4
-   * @param {string} url
-   * @returns {Promise<string>} - file path
-   */
-  async downloadVideo(url) {
-    const info = await this.getVideoInfo(url);
-    const safeTitle = info.title.replace(/[^a-z0-9]/gi, "_");
-    const filepath = path.resolve(this.downloadFolder, `${safeTitle}.mp4`);
-
-    return new Promise((resolve, reject) => {
-      const stream = ytdl(url, {
-        quality: "highestvideo",
-        filter: "videoandaudio",
-      }).pipe(fs.createWriteStream(filepath));
-
-      stream.on("finish", () => resolve(filepath));
-      stream.on("error", (err) => reject(err));
+  static async downloadVideo(url) {
+    const filepath = `./temp/${Date.now()}.mp4`;
+    await new Promise((resolve, reject) => {
+      ytdl(url, { quality: "highestvideo" })
+        .pipe(fs.createWriteStream(filepath))
+        .on("finish", resolve)
+        .on("error", reject);
     });
+    return filepath;
   }
 
-  /**
-   * Download audio in MP3
-   * @param {string} url
-   * @returns {Promise<string>} - file path
-   */
-  async downloadAudio(url) {
-    const info = await this.getVideoInfo(url);
-    const safeTitle = info.title.replace(/[^a-z0-9]/gi, "_");
-    const filepath = path.resolve(this.downloadFolder, `${safeTitle}.mp3`);
-
-    return new Promise((resolve, reject) => {
-      const stream = ytdl(url, { quality: "highestaudio" }).pipe(
-        fs.createWriteStream(filepath)
-      );
-
-      stream.on("finish", () => resolve(filepath));
-      stream.on("error", (err) => reject(err));
+  static async downloadAudio(url) {
+    const filepath = `./temp/${Date.now()}.mp3`;
+    await new Promise((resolve, reject) => {
+      ytdl(url, { filter: "audioonly" })
+        .pipe(fs.createWriteStream(filepath))
+        .on("finish", resolve)
+        .on("error", reject);
     });
+    return filepath;
   }
 }
 
